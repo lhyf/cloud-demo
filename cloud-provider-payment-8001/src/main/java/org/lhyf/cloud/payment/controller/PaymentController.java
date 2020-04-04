@@ -5,7 +5,11 @@ import org.lhyf.cloud.entity.Payment;
 import org.lhyf.cloud.entity.RestResponseBo;
 import org.lhyf.cloud.payment.service.PaymentService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cloud.client.ServiceInstance;
+import org.springframework.cloud.client.discovery.DiscoveryClient;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 /****
  * @author YF
@@ -20,6 +24,9 @@ public class PaymentController {
 
     @Autowired
     private PaymentService paymentService;
+
+    @Autowired
+    private DiscoveryClient discoveryClient;
 
     @PostMapping(value = "/add")
     public RestResponseBo add(@RequestBody Payment payment) {
@@ -38,6 +45,25 @@ public class PaymentController {
             return RestResponseBo.fail("对应记录不存在");
         }
         return RestResponseBo.ok(payment);
+    }
+
+    @GetMapping("/discovery")
+    public DiscoveryClient getDiscoveryClient() {
+
+        List<String> services = discoveryClient.getServices();
+        log.info("注册中心已经注册了的服务清单");
+        for (String service : services) {
+            log.info("service : {}", service);
+        }
+
+        // 获取某个服务名的实例
+        List<ServiceInstance> instances = discoveryClient.getInstances("CLOUD-PROVIDER-PAYMENT");
+        log.info("CLOUD-PROVIDER-PAYMENT 服务的实例清单");
+        for (ServiceInstance instance : instances) {
+            log.info(instance.getServiceId() + "\t" + instance.getInstanceId() + "\t" + instance.getHost() + "\t" + instance.getPort() + "\t" + instance.getUri());
+        }
+
+        return this.discoveryClient;
     }
 
 }

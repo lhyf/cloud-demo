@@ -17,7 +17,7 @@ server:
 # 集群版
 eureka:
   instance:
-    hostname: eureka7001.com #eureka服务端的实例名称
+    hostname: eureka7002.com #eureka服务端的实例名称
   client:
     # false 表示不向注册中心注册自己
     register-with-eureka: false
