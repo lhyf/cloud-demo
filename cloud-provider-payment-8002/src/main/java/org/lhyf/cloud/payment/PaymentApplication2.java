@@ -16,8 +16,8 @@ import org.springframework.cloud.netflix.eureka.EnableEurekaClient;
 @EnableEurekaClient
 @MapperScan(basePackages = "org.lhyf.cloud.payment.mapper")
 @SpringBootApplication
-public class PaymentApplication {
+public class PaymentApplication2 {
     public static void main(String[] args) {
-        SpringApplication.run(PaymentApplication.class);
+        SpringApplication.run(PaymentApplication2.class);
     }
 }

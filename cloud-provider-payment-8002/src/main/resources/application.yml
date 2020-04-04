@@ -1,0 +1,41 @@
+server:
+  port: 8002
+
+spring:
+  application:
+    name: cloud-provider-payment
+
+  datasource:
+    type: com.alibaba.druid.pool.DruidDataSource  #当前数据源操作类型
+    driver-class-name: com.mysql.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/cloud-demo?characterEncoding=utf8&useSSL=false&serverTimezone=UTC&rewriteBatchedStatements=true
+    username: root
+    password: 123456
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+
+
+eureka:
+  client:
+    # 将自己注册进Eureka, 默认是true
+    register-with-eureka: true
+    # 是否从Eureka抓取已有的注册信息,默认为true,单节点无所谓,集群必须设置为true才能配合ribbon使用负载均衡
+    fetch-registry: true
+    service-url:
+      # 单机注册
+#      defaultZone: http://localhost:7001/eureka
+      # 集群注册
+      defaultZone: http://eureka7001.com:7001/eureka,http://eureka7002.com:7002/eureka
+
+
+  instance:
+    instance-id: payment8002 # 修改服务名称
+    prefer-ip-address: true # 访问路径可以显示IP地址
+
+logging:
+  level:
+    org:
+      lhyf: debug
