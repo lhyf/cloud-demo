@@ -1,5 +1,7 @@
 package org.lhyf.cloud.payment.controller;
 
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixProperty;
 import lombok.extern.slf4j.Slf4j;
 import org.lhyf.cloud.entity.Payment;
 import org.lhyf.cloud.entity.RestResponseBo;
@@ -11,6 +13,7 @@ import org.springframework.cloud.client.discovery.DiscoveryClient;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 /****
  * @author YF
@@ -51,6 +54,13 @@ public class PaymentController {
         }
         return RestResponseBo.ok(payment);
     }
+
+
+    @GetMapping("/timeout")
+    public RestResponseBo getTimeOut() {
+        return paymentService.getTimeout();
+    }
+
 
     @GetMapping("/discovery")
     public DiscoveryClient getDiscoveryClient() {

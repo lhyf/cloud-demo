@@ -2,6 +2,7 @@ package org.lhyf.cloud.payment.service;
 
 
 import org.lhyf.cloud.entity.Payment;
+import org.lhyf.cloud.entity.RestResponseBo;
 
 /****
  * @author YF
@@ -13,5 +14,9 @@ public interface PaymentService {
     int create(Payment payment);
 
     Payment getPaymentById(Long id);
+
+    RestResponseBo getTimeout();
+
+    RestResponseBo timeoutFallback();
 
 }

@@ -52,6 +52,13 @@ public class PaymentController {
         return RestResponseBo.ok(payment);
     }
 
+
+    @GetMapping("/timeout")
+    public RestResponseBo getTimeOut() {
+        return paymentService.getTimeout();
+    }
+
+
     @GetMapping("/discovery")
     public DiscoveryClient getDiscoveryClient() {
 

@@ -1,0 +1,32 @@
+server:
+  port: 80
+
+spring:
+  application:
+    name: cloud-consumer-feign-order
+
+eureka:
+  client:
+    fetch-registry: true  #从eureka服务器获取已经注册的服务
+    register-with-eureka: false # 不将自己注册到eureka
+    service-url:
+      defaultZone: http://eureka7001.com:7001/eureka,http://eureka7002.com:7002/eureka        # 集群注册
+
+#全局配置
+ribbon: #设置feign 客户端超时时间(feign 底层使用的是ribbon)
+  ConnectTimeout: 5000 #请求连接的超时时间 默认的时间为 1 秒
+  ReadTimeout: 5000 #请求处理的超时时间
+
+# 针对于 cloud-provider-payment 服务的配置
+cloud-provider-payment:
+  ribbon:
+    OkToRetryOnAllOperations: true #对当前服务所有操作请求都进行重试
+    MaxAutoRetries: 2 #对当前服务的重试次数
+    MaxAutoRetriesNextServer: 0 # 切换实例的重试次数
+    ConnectTimeout: 1200 #请求连接的超时时间
+    ReadTimeout: 1300 #请求处理的超时时间
+
+
+logging:
+  level:
+    org.lhyf.cloud.order.service.PaymentFeignService: debug
