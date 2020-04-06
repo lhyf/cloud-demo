@@ -35,12 +35,12 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     @HystrixCommand(fallbackMethod = "timeoutFallback", commandProperties = {
-            @HystrixProperty(name = "execution.isolation.thread.timeoutInMilliseconds", value = "2000")
+            @HystrixProperty(name = "execution.isolation.thread.timeoutInMilliseconds", value = "600")
     })
     @Override
     public RestResponseBo getTimeout() {
         try {
-            TimeUnit.SECONDS.sleep(3);
+            TimeUnit.MILLISECONDS.sleep(500);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }

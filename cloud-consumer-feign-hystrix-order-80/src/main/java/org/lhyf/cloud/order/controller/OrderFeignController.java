@@ -1,5 +1,8 @@
 package org.lhyf.cloud.order.controller;
 
+import com.netflix.hystrix.contrib.javanica.annotation.DefaultProperties;
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixProperty;
 import lombok.extern.slf4j.Slf4j;
 import org.lhyf.cloud.entity.Payment;
 import org.lhyf.cloud.entity.RestResponseBo;
@@ -16,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 @Slf4j
 @RestController
 @RequestMapping("/order")
+@DefaultProperties(defaultFallback = "globalFallback")
 public class OrderFeignController {
     @Autowired
     private PaymentFeignService paymentService;
@@ -32,9 +36,23 @@ public class OrderFeignController {
         return response;
     }
 
-    @GetMapping("/timeout")
-    public RestResponseBo getTimeOut() {
+//    @HystrixCommand(fallbackMethod = "timeoutFallback", commandProperties = {
+//            @HystrixProperty(name = "execution.isolation.thread.timeoutInMilliseconds", value = "600")
+//    })
+    @HystrixCommand
+    @GetMapping("/timeout/{num}/{name}")
+    public RestResponseBo getTimeOut(@PathVariable("num") Integer num, @PathVariable("name") String name) {
+        int i = 10 / num;
+        System.out.println(name);
         RestResponseBo response = paymentService.getTimeOut();
         return response;
+    }
+
+    public RestResponseBo timeoutFallback(Integer num, String name) {
+        return RestResponseBo.fail("请求失败,这是客户端的默认响应,入参: " + num + ":" + name);
+    }
+
+    public RestResponseBo globalFallback() {
+        return RestResponseBo.fail("请求失败,这是客户端全局的默认响应");
     }
 }
