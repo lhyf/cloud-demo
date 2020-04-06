@@ -2,7 +2,6 @@ package org.lhyf.cloud.order.controller;
 
 import com.netflix.hystrix.contrib.javanica.annotation.DefaultProperties;
 import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
-import com.netflix.hystrix.contrib.javanica.annotation.HystrixProperty;
 import lombok.extern.slf4j.Slf4j;
 import org.lhyf.cloud.entity.Payment;
 import org.lhyf.cloud.entity.RestResponseBo;

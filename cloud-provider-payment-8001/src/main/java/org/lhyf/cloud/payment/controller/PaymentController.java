@@ -78,4 +78,11 @@ public class PaymentController {
         return this.discoveryClient;
     }
 
+    /**********服务熔断测试**********/
+
+    @GetMapping("/break/{num}")
+    public RestResponseBo paymentCircuitBreaker(@PathVariable("num") int num) {
+        return paymentService.paymentCircuitBreaker(num);
+    }
+
 }

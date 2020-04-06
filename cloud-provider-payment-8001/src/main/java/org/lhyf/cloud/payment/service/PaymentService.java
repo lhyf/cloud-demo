@@ -19,4 +19,8 @@ public interface PaymentService {
 
     RestResponseBo timeoutFallback();
 
+    RestResponseBo paymentCircuitBreaker(int num);
+
+    RestResponseBo fallbackCircuitBreaker(int num);
+
 }

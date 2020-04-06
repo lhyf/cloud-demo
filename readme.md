@@ -45,11 +45,11 @@
 
 修改前
 
-![](https://github.com/lhyf/cloud-demo/blob/master/img/182004289411681.png)
+![](.\img\182004289411681.png)
 
 修改后
 
-![](https://github.com/lhyf/cloud-demo/blob/master/img/1672040464105109.png)
+![](.\img\1672040464105109.png)
 
 引用actuator jar
 
@@ -245,4 +245,562 @@ feign 是一个声明式Web Service客户端. 使用Feign能让编写Web Service
 Spring MVC 标准建注解和HttpMessageConverters. Feign 可以与Eureka和Ribbon 组合使用以支持负载均衡
 
 Feign 集成了Ribbon
+
+## 使用步骤
+
+引入maven 依赖
+
+```xml
+<!--feign-->
+<dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-starter-openfeign</artifactId>
+</dependency>
+```
+
+主启动类开启feign client 使用
+```java
+@EnableFeignClients
+@SpringBootApplication
+public class FeignOrderApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(FeignOrderApplication.class);
+    }
+}
+```
+
+编写调用接口,并使用@FeignClient 修饰
+
+```java
+@Component
+@FeignClient(value = "CLOUD-PROVIDER-PAYMENT")
+@RequestMapping("/payment")
+public interface PaymentFeignService {
+    @PostMapping(value = "/add")
+    RestResponseBo add(@RequestBody Payment payment);
+
+    @GetMapping("/get")
+    RestResponseBo getPaymentById(@RequestParam(value = "id") Long id);
+}
+
+```
+
+服务端(服务名:CLOUD-PROVIDER-PAYMENT)
+
+```java
+@Slf4j
+@RestController
+@RequestMapping(value = "/payment")
+public class PaymentController {
+
+    @Autowired
+    private PaymentService paymentService;
+
+    @Autowired
+    private DiscoveryClient discoveryClient;
+
+    @Value("${server.port}")
+    private String port;
+
+    @PostMapping(value = "/add")
+    public RestResponseBo add(@RequestBody Payment payment) {
+        int i = paymentService.create(payment);
+        log.info("插入payment:{}", i);
+        if (i > 0) {
+            return RestResponseBo.ok(payment);
+        }
+        return RestResponseBo.fail();
+    }
+
+    @GetMapping("/get")
+    public RestResponseBo getPaymentById(@RequestParam(value = "id") Long id) {
+        Payment payment = paymentService.getPaymentById(id);
+        payment.setSerial(payment.getSerial() + " : " + port);
+        if (payment == null) {
+            return RestResponseBo.fail("对应记录不存在");
+        }
+        return RestResponseBo.ok(payment);
+    }
+}
+```
+
+客户端使用
+
+```java
+@Slf4j
+@RestController
+@RequestMapping("/order")
+public class OrderFeignController {
+    @Autowired
+    private PaymentFeignService paymentService;
+
+    @PostMapping("/add")
+    public RestResponseBo<Payment> add(@RequestBody Payment payment) {
+        RestResponseBo result = paymentService.add(payment);
+        return result;
+    }
+
+    @GetMapping("/get")
+    public RestResponseBo<Payment> getPaymentById(@RequestParam(value = "id") Long id) {
+        RestResponseBo response = paymentService.getPaymentById(id);
+        return response;
+    }
+}
+```
+
+## @FeignClient 注解参数说明
+
+
+
+## Feign超时控制
+
+OpenFeign 默认等待1秒钟, 超过后报错
+
+```yaml
+
+#全局配置
+ribbon: #设置feign 客户端超时时间(feign 底层使用的是ribbon)
+  ConnectTimeout: 5000 #请求连接的超时时间 默认的时间为 1 秒
+  ReadTimeout: 5000 #请求处理的超时时间
+
+# 针对于 cloud-provider-payment 服务的配置
+cloud-provider-payment:
+  ribbon:
+    OkToRetryOnAllOperations: true #对当前服务所有操作请求都进行重试
+    MaxAutoRetries: 2 #对当前服务的重试次数
+    MaxAutoRetriesNextServer: 0 # 切换实例的重试次数
+    ConnectTimeout: 1200 #请求连接的超时时间
+    ReadTimeout: 1300 #请求处理的超时时间
+```
+
+## Feign日志打印功能
+
+feign提供了日志打印功能, 我们可以通过配置来调整日志级别, 从而了解Feign 中Http 请求细节,
+
+### 日志级别
+
+- NONE: 默认的, 不显示任何日志
+- BASIC: 仅记录请求方法,URL,响应状态码及执行时间
+- HEADERS: 除BASIC中定义的信息外,还有请求和响应的头信息
+- FULL: 除了HEADERS中定义的信息外,还有请求和响应的正文及元数据
+
+### 配置步骤
+
+```java
+// 添加feign日志配置类
+@Configuration
+public class FeignConfig {
+    @Bean
+    Logger.Level feignLoggerLevel() {
+        return Logger.Level.FULL;
+    }
+}
+```
+
+```yaml
+# 为对应的接口开启debug级别日志
+logging:
+  level:
+    org.lhyf.cloud.order.service.PaymentFeignService: debug
+```
+
+```
+---> GET http://CLOUD-PROVIDER-PAYMENT/payment/get?id=31 HTTP/1.1
+---> END HTTP (0-byte body)
+<--- HTTP/1.1 200 (3ms)
+connection: keep-alive
+content-type: application/json
+date: Sun, 05 Apr 2020 03:28:42 GMT
+keep-alive: timeout=60
+transfer-encoding: chunked
+{"payload":{"id":31,"serial":"111 : 8001"},"success":true,"msg":null,"code":-1,"timestamp":1586057322}
+<--- END HTTP (111-byte body)
+```
+
+# 服务熔断与降级
+
+## Hystrix
+
+Hystrix是一个用于处理分布式系统的延迟和容错的开源库, 在分布式系统里, 许多依赖不可避免的会调用失败, 比如超时, 异常等, Hystrix能保证在一个依赖出问题的情况下, 不会导致整体服务失败, 避免级联故障, 以提高分布式系统的弹性. **向调用方返回一个符合预期的, 可处理的备选响应(Fallback), 而不是长时间的等待或者抛出调用方无法处理的异常, 这样就保证了服务调用方的线程不会被长时间, 不必要地占用,** 从而避免故障在分布式系统中的蔓延, 乃至雪崩.
+
+### 服务降级
+
+**服务降级，**当服务器压力剧增的情况下，根据当前业务情况及流量对一些服务和页面有策略的降级，以此释放服务器资源以保证核心任务的正常运行。降级：是利用有限资源，保障系统核心功能高可用、有损的架构方法。有限资源；核心高可用；有损；架构方法。
+
+**自动降级方式有哪些？**
+超时降级 —— 主要配置好超时时间和超时重试次数和机制，并使用异步机制探测恢复情况
+
+失败次数降级 —— 主要是一些不稳定的API，当失败调用次数达到一定阀值自动降级，同样要使用异步机制探测回复情况
+
+故障降级 —— 如要调用的远程服务挂掉了（网络故障、DNS故障、HTTP服务返回错误的状态码和RPC服务抛出异常），则可以直接降级
+
+限流降级 —— 当触发了限流超额时，可以使用暂时屏蔽的方式来进行短暂的屏蔽
+**服务端服务降级**
+
+```xml
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-netflix-hystrix</artifactId>
+        </dependency>
+```
+
+```java
+    @Service
+    public class PaymentServiceImpl implements PaymentService {
+        // 在service层 为 getTimeout 方法提供兜底方法,超过2秒或者运行异常,则使用timeoutFallback响应
+        @HystrixCommand(fallbackMethod = "timeoutFallback", commandProperties = {
+                @HystrixProperty(name = "execution.isolation.thread.timeoutInMilliseconds", value = "2000")
+        })
+        @Override
+        public RestResponseBo getTimeout() {
+            try {
+                TimeUnit.SECONDS.sleep(3);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return RestResponseBo.ok();
+        }
+
+        @Override
+        public RestResponseBo timeoutFallback() {
+            return RestResponseBo.fail("请求失败,这是服务端的默认响应");
+        }
+    }
+```
+
+```java
+	// 主启动类开启断路器
+    @EnableCircuitBreaker
+    @EnableDiscoveryClient
+    @EnableEurekaClient
+    @MapperScan(basePackages = "org.lhyf.cloud.payment.mapper")
+    @SpringBootApplication
+    public class PaymentApplication1 {
+        public static void main(String[] args) {
+            SpringApplication.run(PaymentApplication1.class);
+        }
+    }
+```
+
+**消费端服务降级**
+
+```xml
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-netflix-hystrix</artifactId>
+        </dependency>
+```
+
+```yaml
+feign:
+  hystrix:
+    enabled: true # 开启全局服务降级
+```
+
+```java
+@EnableCircuitBreaker // 启用hystrix
+@EnableFeignClients
+@SpringBootApplication
+public class HystrixOrderApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(HystrixOrderApplication.class);
+    }
+}
+```
+
+兜底方法的参数签名和原方法必须一致, **如果服务端与客户端都配置了降级,当服务端发生降级时,客户端也会触发降级(不管客户端设置的超时时间是多少,服务端响应降级,则客户端不会再等到自己配置的超时时间,而是直接响应), 同时响应客户端自己的默认响应**
+```java
+@Slf4j
+@RestController
+@RequestMapping("/order")
+public class OrderFeignController {
+   
+    // 为单独的方法配置降级,如果服务端 1.5秒无数据返回,则将返回默认的响应
+    @HystrixCommand(fallbackMethod = "timeoutFallback", commandProperties = {
+            @HystrixProperty(name = "execution.isolation.thread.timeoutInMilliseconds", value = "1500")
+    })
+    @GetMapping("/timeout/{num}/{name}")
+    public RestResponseBo getTimeOut(@PathVariable("num") Integer num, @PathVariable("name") String name) {
+        int i = 10 / num;
+        System.out.println(name);
+        RestResponseBo response = paymentService.getTimeOut();
+        return response;
+    }
+
+    public RestResponseBo timeoutFallback(Integer num, String name) {
+        return RestResponseBo.fail("请求失败,这是客户端的默认响应,入参: " + num + ":" + name);
+    }
+}
+```
+
+**客户端配置全局的默认响应**
+
+```java
+@Slf4j
+@RestController
+@RequestMapping("/order")
+// 指定全局的默认响应
+@DefaultProperties(defaultFallback = "globalFallback")
+public class OrderFeignController {
+    
+    // 需要降级的方法,需要使用 @HystrixCommand 修饰
+    @HystrixCommand
+    @GetMapping("/timeout/{num}/{name}")
+    public RestResponseBo getTimeOut(@PathVariable("num") Integer num, @PathVariable("name") String name) {
+        int i = 10 / num;
+        System.out.println(name);
+        RestResponseBo response = paymentService.getTimeOut();
+        return response;
+    }
+
+    public RestResponseBo globalFallback() {
+        return RestResponseBo.fail("请求失败,这是客户端全局的默认响应");
+    }
+}
+```
+
+**为所有的服务方法提供降级** 注意:在为PaymentFeignService提供实现类PaymentFeignServiceFallbackImpl 后不能再使用@RequestMapping
+
+```java
+// feign 接口方法
+@Component
+@FeignClient(value = "CLOUD-PROVIDER-PAYMENT", fallback = PaymentFeignServiceFallbackImpl.class)
+//@RequestMapping("/payment")
+public interface PaymentFeignService {
+    @PostMapping(value = "/payment/add")
+    RestResponseBo add(@RequestBody Payment payment);
+
+    @GetMapping("/payment/get")
+    RestResponseBo getPaymentById(@RequestParam(value = "id") Long id);
+
+    @GetMapping("/payment/timeout")
+    RestResponseBo getTimeOut();
+}
+```
+
+```java
+@Component
+public class PaymentFeignServiceFallbackImpl implements PaymentFeignService {
+    @Override
+    public RestResponseBo add(Payment payment) {
+        return RestResponseBo.fail("服务调用失败");
+    }
+
+    @Override
+    public RestResponseBo getPaymentById(Long id) {
+        return RestResponseBo.fail("服务调用失败");
+    }
+
+    @Override
+    public RestResponseBo getTimeOut() {
+        return RestResponseBo.fail("服务调用失败");
+    }
+}
+```
+
+```java
+@Slf4j
+@RestController
+@RequestMapping("/order")
+public class OrderFeignController {
+    // 当服务端不可用或超时时, PaymentFeignService 里的每个方法都有默认的返回值
+    @Autowired
+    private PaymentFeignService paymentService;
+
+    @PostMapping("/add")
+    public RestResponseBo<Payment> add(@RequestBody Payment payment) {
+        RestResponseBo result = paymentService.add(payment);
+        return result;
+    }
+
+    @GetMapping("/get")
+    public RestResponseBo<Payment> getPaymentById(@RequestParam(value = "id") Long id) {
+        RestResponseBo response = paymentService.getPaymentById(id);
+        return response;
+    }
+
+
+    @GetMapping("/timeout/{num}/{name}")
+    public RestResponseBo getTimeOut(@PathVariable("num") Integer num, @PathVariable("name") String name) {
+        int i = 10 / num;
+        System.out.println(name);
+        RestResponseBo response = paymentService.getTimeOut();
+        return response;
+    }
+}
+```
+
+
+
+### 服务熔断
+
+**服务熔断**则是对于目标服务的请求和调用大量超时或失败，这时应该熔断该服务的所有调用，并且对于后续调用应直接返回，从而快速释放资源，确保在目标服务不可用的这段时间内，所有对它的调用都是立即返回，不会阻塞的。**当检测到该节点微服务调用响应正常后,恢复调用链路.**
+
+Hystrix会监控服务间调用的状况, **当失败的调用到了一定阈值, 缺省是5秒内20次调用失败,就会启动熔断机制**, 熔断机制的注解是@HystrixCommand
+
+```java
+// 开启熔断
+@EnableCircuitBreaker
+@EnableDiscoveryClient
+@EnableEurekaClient
+@MapperScan(basePackages = "org.lhyf.cloud.payment.mapper")
+@SpringBootApplication
+public class PaymentApplication1 {
+    public static void main(String[] args) {
+        SpringApplication.run(PaymentApplication1.class);
+    }
+}
+```
+
+```java
+@Slf4j
+@RestController
+@RequestMapping(value = "/payment")
+public class PaymentController {
+
+    @Autowired
+    private PaymentService paymentService;
+
+    @GetMapping("/get")
+    public RestResponseBo getPaymentById(@RequestParam(value = "id") Long id) {
+        Payment payment = paymentService.getPaymentById(id);
+        payment.setSerial(payment.getSerial() + " : " + port);
+        if (payment == null) {
+            return RestResponseBo.fail("对应记录不存在");
+        }
+        return RestResponseBo.ok(payment);
+    }
+    
+    @GetMapping("/break/{num}")
+    public RestResponseBo paymentCircuitBreaker(@PathVariable("num") int num) {
+        return paymentService.paymentCircuitBreaker(num);
+    }
+}
+```
+
+```java
+@Service
+public class PaymentServiceImpl implements PaymentService {
+
+    @Override
+    public Payment getPaymentById(Long id) {
+        return paymentMapper.getPaymentById(id);
+    }
+
+    
+    /**********服务熔断测试**********/
+    /**
+     * Hystrix在运行过程中会向每个commandKey对应的熔断器报告 成功、失败、超时和拒绝的状态，熔断器维护计算统计的数据，
+     * 根据这些统计的信息来确定熔断器是否打开。如果打开，后续的请求都会被截断。
+     * 然后会隔一段时间默认是5s，尝试半开，放入一部分流量请求进来，相当于对依赖服务进行一次健康检查，如果恢复，熔断器关闭，随后完全恢复调用。
+     * @return
+     */
+    @HystrixCommand(fallbackMethod = "fallbackCircuitBreaker",commandProperties = {
+            // 此属性确定断路器是否用于跟踪健康状况，以及在断路器跳闸时是否用于短路请求。
+            @HystrixProperty(name = "circuitBreaker.enabled",value = "true"),
+            // 熔断器强制打开，始终保持打开状态。默认值FLASE。
+            @HystrixProperty(name = "circuitBreaker.forceOpen",value = "false"),
+            // 熔断器强制关闭，始终保持关闭状态。默认值FLASE。
+            @HystrixProperty(name = "circuitBreaker.forceClosed",value = "false"),
+            // 此属性设置将跳闸电路的滚动窗口中的最小请求数。
+            // 例如，如果这个值是20，那么在滚动窗口(比如一个10秒的窗口)中只接收到19个请求，即使所有19个请求都失败了，电路也不会跳闸打开。
+            @HystrixProperty(name = "circuitBreaker.requestVolumeThreshold",value = "10"),
+            // 半开试探休眠时间，默认值5000ms。当熔断器开启一段时间之后比如5000ms，
+            // 会尝试放过去一部分流量进行试探，确定依赖服务是否恢复。
+            @HystrixProperty(name = "circuitBreaker.sleepWindowInMilliseconds",value = "10000"),
+            // 设定错误百分比，默认值50%，例如一段时间（10s）内有100个请求，其中有55个超时或者异常返回了，
+            // 那么这段时间内的错误百分比是55%，大于了默认值50%，这种情况下触发熔断器-打开。
+            @HystrixProperty(name = "circuitBreaker.errorThresholdPercentage",value = "60")
+    })
+    @Override
+    public RestResponseBo paymentCircuitBreaker(int num) {
+        if(num < 0){
+            throw new IllegalArgumentException("参数不能小于0");
+        }
+        return RestResponseBo.ok("服务端的正常返回");
+    }
+
+    @Override
+    public RestResponseBo fallbackCircuitBreaker(int num) {
+        return RestResponseBo.fail("服务端熔断的默认返回");
+    }
+}
+
+```
+
+现象: 多次访问 http://127.0.0.1:8001/payment/break/-1 造成服务熔断后,再次访问  http://127.0.0.1:8001/payment/break/0,依然提示熔断,此时访问 getPaymentById()方法,正常返回. 等待10秒(circuitBreaker.sleepWindowInMilliseconds) 后会尝试放行访问,如果访问成功,则取消熔断,若访问依然失败,则继续熔断
+
+- 熔断打开: 请求不在进行调用当前服务, 内部设置时钟一般为MTTR(平均故障处理时间), 当打开时长达到设置时钟则进入半熔断状态
+
+- 熔断关闭: 熔断关闭不会对服务进行熔断
+- 熔断半开: 部分请求根据规则调用当前服务, 如果请求成功且符合规则则认为当前服务恢复正常, 关闭熔断
+
+![Hystrix 工作流程图](https://raw.githubusercontent.com/wiki/Netflix/Hystrix/images/hystrix-command-flow-chart.png)
+
+
+
+### 服务限流
+
+只允许系统能够承受的访问量进来，超出的会被丢弃。
+
+### 实时监控
+
+
+
+
+
+# Gateway
+
+**能干嘛**: 反向代理, 鉴权, 流量控制, 熔断, 日志监控...
+
+## 三大核心概念
+
+### Route(路由)
+
+这是网关的基本构建块。它由一个 ID，一个目标 URI，一组断言和一组过滤器定义。如果断言为真，则路由匹配
+
+### Predicate(断言)
+
+这是一个 Java 8 的 Predicate。输入类型是一个 ServerWebExchange。我们可以使用它来匹配来自 HTTP 请求的任何内容，例如 headers 或参数。如果请求与断言相匹配则进行路由
+
+### Filter(过滤)
+
+这是org.springframework.cloud.gateway.filter.GatewayFilter的实例，我们可以使用它修改请求和响应。
+
+## 工作流程
+1. 客户端向 Spring Cloud Gateway 发出请求, 然后在Gateway Handler Mapping 中找到与请求相匹配的路由,将其发送到Gateway Web Handler.
+2. Handler 再通过指定的过滤器来将请求发送到我们实际的服务执行业务逻辑, 然后返回. 过滤器之间用虚线分开是因为过滤器可能会在发送代理请求之前(pre)或之后(post)执行业务逻辑.
+3. Filter 在pre 类型的过滤器可以做参数校验,权限校验,流量监控,日志输出,协议转换等,在 post 类型的过滤器中可以做响应内容, 响应头的修改,日志输出, 流量监控等重要的作用.
+
+![Gateway 工作流程图](https://cloud.spring.io/spring-cloud-static/spring-cloud-gateway/2.2.2.RELEASE/reference/html/images/spring_cloud_gateway_diagram.png)
+
+## 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
