@@ -774,26 +774,219 @@ public class PaymentServiceImpl implements PaymentService {
 
 ![Gateway 工作流程图](https://cloud.spring.io/spring-cloud-static/spring-cloud-gateway/2.2.2.RELEASE/reference/html/images/spring_cloud_gateway_diagram.png)
 
-## 
+## 配置
 
+使用yml配置路由
 
+```yaml
+spring:
+  application:
+    name: cloud-gateway
+  cloud:
+    gateway:
+      routes:
+        - id: payment #路由id, 没有固定规则但要求唯一, 建议配服务名
+          uri: http://127.0.0.1:8001 #匹配后提供服务的路由地址
+          predicates:
+            - Path=/payment/get/** #断言,路径匹配的进行路由
 
+        - id: payment #路由id, 没有固定规则但要求唯一, 建议配服务名
+          uri: http://127.0.0.1:8001 #匹配后提供服务的路由地址
+          predicates:
+          - Path=/payment/break/** #断言,路径匹配的进行路由
 
+```
 
+使用配置类配置
 
+```yaml
+    @Bean
+    public RouteLocator routeLocator(RouteLocatorBuilder builder) {
+        RouteLocator locator = builder.routes()
+                .route("route1", r -> r.path("/lhyf")
+                        .uri("http://www.lhyf.org")
+        ).build();
 
+        return locator;
+    }
+```
 
+使用注册中心实现动态路由
 
+```yaml
+spring:
+  application:
+    name: cloud-gateway
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          enabled: true #开启从注册中心动态创建路由的功能,利用微服务名进行路由
+      routes:
+        - id: payment #路由id, 没有固定规则但要求唯一, 建议配服务名
+          uri: lb://cloud-provider-payment #匹配后提供服务的路由地址
+          predicates:
+            - Path=/payment/get/** #断言,路径匹配的进行路由
 
+        - id: payment #路由id, 没有固定规则但要求唯一, 建议配服务名
+          uri: lb://cloud-provider-payment #匹配后提供服务的路由地址
+          predicates:
+          - Path=/payment/break/** #断言,路径匹配的进行路由
 
+```
 
+## Predicate
 
+**After Route Predicate Factory**
+**The Before Route Predicate Factory**
 
+带有一个参数,一个 ZonedDateTime 类型 `datetime` , 这个断言匹配 发生在指定的时间之后(前)的请求.
 
+```yaml
+spring:
+  cloud:
+    gateway:
+      routes:
+      - id: after_route
+        uri: https://example.org
+        predicates:
+        - After=2017-01-20T17:42:47.789-07:00[America/Denver]
+```
 
+**The Between Route Predicate Factory**
 
+接收两个日期参数，判断请求日期是否在指定时间段内
 
+```yaml
+spring:
+  cloud:
+    gateway:
+      routes:
+      - id: between_route
+        uri: https://example.org
+        predicates:
+        - Between=2017-01-20T17:42:47.789-07:00[America/Denver], 2017-01-21T17:42:47.789-07:00[America/Denver]
+```
 
+**The Cookie Route Predicate Factory**
+cookie断言带有两个参数, `cookie name` 和 `regexp`(Java 的正则表达式), 此断言匹配含有指定cookie名,且cookie值匹配正则表达式的请求
+
+```yaml
+spring:
+  cloud:
+    gateway:
+      routes:
+      - id: cookie_route
+        uri: https://example.org
+        predicates:
+        - Cookie=chocolate, ch.p # 这个路由匹配请求含有 cookie名为 chocolate ,它的值匹配 ch.p 正则表达式的请求
+```
+
+**The Header Route Predicate Factory**
+
+含有两个参数,  header `name` 和 `regexp`
+
+```yaml
+spring:
+  cloud:
+    gateway:
+      routes:
+      - id: header_route
+        uri: https://example.org
+        predicates:
+        - Header=X-Request-Id, \d+ # 匹配 header named 是 X-Request-Id ,它的值匹配 \d+ 的请求
+```
+
+**The Host Route Predicate Factory**
+
+含有一个参数: 主机名的列表`patterns`。该模式是带有`.`分隔符的Ant样式的模式
+
+```yaml
+spring:
+  cloud:
+    gateway:
+      routes:
+      - id: host_route
+        uri: https://example.org
+        predicates:
+        - Host=**.somehost.org,**.anotherhost.org
+```
+
+**The Method Route Predicate Factory**
+
+需要`methods`的参数，它是一个或多个参数：HTTP请求方式来匹配
+
+```yaml
+spring:
+  cloud:
+    gateway:
+      routes:
+      - id: method_route
+        uri: https://example.org
+        predicates:
+        - Method=GET,POST
+```
+
+**The Path Route Predicate Factory**
+拥有两个参数, Path Route Predicate Factory使用的是path列表作为参数，使用Spring的`PathMatcher`匹配path，可以设置可选变量。
+
+```yaml
+spring:
+  cloud:
+    gateway:
+      routes:
+      - id: path_route
+        uri: https://example.org
+        predicates:
+        - Path=/red/{segment},/blue/{segment}
+```
+
+**The Query Route Predicate Factory**
+两个参数, 一个要求的 'param' 和一个可选的正则表达式
+```yaml
+spring:
+  cloud:
+    gateway:
+      routes:
+      - id: query_route
+        uri: https://example.org
+        predicates:
+        - Query=green  # 如果请求中包含有 gree的请求参数,则将被匹配
+        
+        - Query=red, gree. # 如果请求中包含有red 的请求参数,它的值匹配 gree. 的正则表达式,则将被匹配
+```
+
+**The RemoteAddr Route Predicate Factory**
+
+需要一个是 CIDR表示法(IPv4 or IPv6)的字符串list(最小的size=1) 的source, 例如 192.168.0.1/16
+
+```yaml
+spring:
+  cloud:
+    gateway:
+      routes:
+      - id: remoteaddr_route
+        uri: https://example.org
+        predicates:
+        - RemoteAddr=192.168.1.1/24 # 如果请求的远程地址为，则此路由匹配192.168.1.10
+```
+
+**The Weight Route Predicate Factory**
+含有两个参数 `group` 和 `weight`(一个 int ) , 权重是按组计算的
+```yaml
+spring:
+  cloud:
+    gateway:
+      routes:
+      - id: weight_high
+        uri: https://weighthigh.org
+        predicates:
+        - Weight=group1, 8
+      - id: weight_low
+        uri: https://weightlow.org
+        predicates:
+        - Weight=group1, 2 # 这条路由会将大约80％的流量转发到weighthigh.org，将大约20％的流量转发到weightlow.org。
+```
 
 
 
