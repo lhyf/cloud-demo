@@ -774,7 +774,7 @@ public class PaymentServiceImpl implements PaymentService {
 
 ![Gateway 工作流程图](https://cloud.spring.io/spring-cloud-static/spring-cloud-gateway/2.2.2.RELEASE/reference/html/images/spring_cloud_gateway_diagram.png)
 
-## 配置
+## 路由配置
 
 使用yml配置路由
 
@@ -835,7 +835,7 @@ spring:
 
 ```
 
-## Predicate
+## Predicate(断言)
 
 **After Route Predicate Factory**
 **The Before Route Predicate Factory**
@@ -987,6 +987,93 @@ spring:
         predicates:
         - Weight=group1, 2 # 这条路由会将大约80％的流量转发到weighthigh.org，将大约20％的流量转发到weightlow.org。
 ```
+
+## Filter(过滤器)
+
+指的是Spring框架中GatewayFilter的实例, 使用过滤器, 可以在请求路由前后对请求进行修改
+
+**GatewayFilter Factories (过滤器工厂)** (30多种)
+
+```yaml
+spring:
+  cloud:
+    gateway:
+      routes:
+      - id: add_request_header_route
+        uri: https://example.org
+        predicates:
+        - Path=/red/{segment}
+        filters:
+        - AddRequestHeader=X-Request-Red, Blue-{segment} #此清单将X-Request-Red, Blue-{segment} 请求头添加到所有匹配请求的下游请求头中。
+```
+
+**Global Filters (全局过滤器)**
+
+
+
+
+
+**自定义全局过滤器**
+
+```java
+@Slf4j
+@Component
+public class GlobalLogFilter implements GlobalFilter, Ordered {
+
+    @Override
+    public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
+        ServerHttpRequest request = exchange.getRequest();
+        String name = request.getQueryParams().getFirst("name");
+        if (StringUtils.isEmpty(name)) {
+            log.error("用户名不能为空");
+            ServerHttpResponse response = exchange.getResponse();
+            response.setStatusCode(HttpStatus.FORBIDDEN);
+            return response.setComplete();
+        }
+        return chain.filter(exchange);
+    }
+
+
+    @Override
+    public int getOrder() {
+        return 0;
+    }
+}
+
+```
+
+
+
+# 配置中心
+
+## Spring Cloud Config 
+
+为微服务架构中的微服务提供了集中化的外部配置支持, 配置服务器为各个不同微服务应用的所有环境提供了一个中心化的外部配置
+
+
+
+# 消息总线
+
+## Spring Cloud Bus 
+
+Spring cloud bus 是用来将分布式系统的节点与轻量级消息系统连接起来的框架, 它整合了Java的时间处理机制和消息中间件的功能, Bus 支持两种消息代理: RabbitMQ 和 Kafka, 能管理和传播分布式系统间的消息, 就像一个分布式执行器, 可用于广播状态更改, 事件推送等,也可以当做微服务间的通信通道.
+
+
+
+**什么是总线**
+
+在微服务架构的系统中, 通常会使用**轻量级的消息代理**来构建一个公用的消息主题,并放系统中所有微服务实例都连接上来. 由于**该主题中产生的消息会被所有实例监听和消费, 所以称他为消息总线**, 在总线上的各个实例,都可以方便地广播一些需要其他连在该主题上的实例都知道的消息.
+
+**基本原理**
+
+ConfigClient 实例都监听MQ中同一个topic(默认是SpringCloudBus), 当一个服务刷新数据的时候, 它会把这个消息放入Topic中, 这样其它监听同一Topic的服务就能得到通知, 然后去更新自身的配置.
+
+
+
+
+
+
+
 
 
 
