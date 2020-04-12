@@ -1068,6 +1068,99 @@ Spring cloud bus 是用来将分布式系统的节点与轻量级消息系统连
 
 ConfigClient 实例都监听MQ中同一个topic(默认是SpringCloudBus), 当一个服务刷新数据的时候, 它会把这个消息放入Topic中, 这样其它监听同一Topic的服务就能得到通知, 然后去更新自身的配置.
 
+## 使用
+
+```xml
+  <!--添加消息总线RabbitMQ 支持-->
+    <dependency>
+        <groupId>org.springframework.cloud</groupId>
+        <artifactId>spring-cloud-starter-bus-amqp</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-actuator</artifactId>
+    </dependency>
+```
+
+**服务端**
+
+```yaml
+server:
+  port: 3344
+spring:
+  application:
+    name: cloud-config-center #注册进Eureka的服务名
+  #RabbitMQ相关配置
+  rabbitmq:
+    host: 192.168.31.201
+    port: 5672
+    username: guest
+    password: guest
+
+eureka:
+  client:
+    # 将自己注册进Eureka, 默认是true
+    register-with-eureka: true
+    # 是否从Eureka抓取已有的注册信息,默认为true,单节点无所谓,集群必须设置为true才能配合ribbon使用负载均衡
+    fetch-registry: false
+    service-url:
+      # 单机注册
+      #      defaultZone: http://localhost:7001/eureka
+      # 集群注册
+      defaultZone: http://eureka7001.com:7001/eureka,http://eureka7002.com:7002/eureka
+  instance:
+    instance-id: config-center3344 # 修改服务名称
+    prefer-ip-address: true # 访问路径可以显示IP地址
+
+
+
+#RabbitMQ 相关配置, 暴露bus刷新配置的端点
+management:
+  endpoints: #暴露bus 刷新配置的端点
+    web:
+      exposure:
+        include: 'bus-refresh' #用于刷新配置的链接
+
+```
+**客户端**
+
+```yaml
+server:
+  port: 3355
+spring:
+  application:
+    name: cloud-config-client #注册进Eureka的服务名
+  #RabbitMQ相关配置
+  rabbitmq:
+    host: 192.168.31.201
+    port: 5672
+    username: guest
+    password: guest
+
+eureka:
+  client:
+    # 将自己注册进Eureka, 默认是true
+    register-with-eureka: true
+    # 是否从Eureka抓取已有的注册信息,默认为true,单节点无所谓,集群必须设置为true才能配合ribbon使用负载均衡
+    fetch-registry: true
+    service-url:
+      # 单机注册
+      #      defaultZone: http://localhost:7001/eureka
+      # 集群注册
+      defaultZone: http://eureka7001.com:7001/eureka,http://eureka7002.com:7002/eureka
+  instance:
+    instance-id: config-client3355 # 修改服务名称
+    prefer-ip-address: true # 访问路径可以显示IP地址
+
+
+#RabbitMQ 相关配置, 暴露bus刷新配置的端点
+management:
+  endpoints: #暴露bus 刷新配置的端点
+    web:
+      exposure:
+        include: '*'
+
+```
 
 
 
