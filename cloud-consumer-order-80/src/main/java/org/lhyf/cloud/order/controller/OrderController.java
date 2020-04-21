@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.lhyf.cloud.entity.Payment;
 import org.lhyf.cloud.entity.RestResponseBo;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 
@@ -33,5 +34,12 @@ public class OrderController {
     @GetMapping("/get")
     public RestResponseBo<Payment> getPaymentById(@RequestParam(value = "id") Long id) {
         return restTemplate.getForObject(PAYMENT_URL + "/payment/get?id=" + id, RestResponseBo.class);
+    }
+
+    public void test(){
+        ResponseEntity<Payment> response = restTemplate.getForEntity(PAYMENT_URL + "/payment/get?id={1}", Payment.class, 1);
+
+        Payment body = response.getBody();
+
     }
 }

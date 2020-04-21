@@ -149,6 +149,31 @@ public class PaymentApplication {
 
 **Ribbon 本地负载均衡, 在调用微服务接口的时候, 会在注册中心上获取注册信息服务列表之后缓存到JVM本地, 从而在本地实现RPC远程调用技术.**
 
+## Ribbon 基础使用
+
+**getForEntity**
+
+```java
+// 方式一
+// 使用 "didi" 参数替换url中的{1} 占位符
+    restTemplate.getForEntity("http://HELLO-SERVICE/hello1?name={1}", String.class, "didi")
+
+// 方式二
+    Map<String, String> params = new HashMap<>();
+    params.put("name", "dada");
+    restTemplate.getForEntity("http://HELLO-SERVICE/hello1?name={name}", String.class, params)
+// 方式三
+   UriComponents uriComponents = UriComponentsBuilder.fromUriString(
+        "http://HELLO-SERVICE/hello1?name={name}")
+        .build()
+        .expand("dodo")
+        .encode();
+    URI uri = uriComponents.toUri();
+    restTemplate.getForEntity(uri, String.class);
+```
+
+
+
 | 负载算法实现类                                     | 说明                                                         |
 | -------------------------------------------------- | ------------------------------------------------------------ |
 | com.netflix.loadbalancer.RoundRobinRule            | 轮询                                                         |
