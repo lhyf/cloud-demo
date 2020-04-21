@@ -45,11 +45,11 @@
 
 修改前
 
-![](.\img\182004289411681.png)
+![](https://raw.githubusercontent.com/lhyf/cloud-demo/master/img/1672040464105109.png)
 
 修改后
 
-![](.\img\1672040464105109.png)
+![](https://raw.githubusercontent.com/lhyf/cloud-demo/master/img/182004289411681.png)
 
 引用actuator jar
 
